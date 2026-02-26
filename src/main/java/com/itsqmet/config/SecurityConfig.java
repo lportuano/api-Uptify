@@ -26,7 +26,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
-                        //.requestMatchers("/usuarios/registrarUsuario").hasRole("ADMIN")
+                        .requestMatchers("/usuarios/registrarUsuario").permitAll()
                         .requestMatchers("/login", "/usuarios/**").permitAll()
                         .anyRequest().authenticated()
                 );
