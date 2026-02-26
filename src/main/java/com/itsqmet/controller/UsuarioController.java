@@ -3,46 +3,59 @@ package com.itsqmet.controller;
 import com.itsqmet.entity.Usuario;
 import com.itsqmet.service.UsuarioService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity; // Añadido para respuestas claras
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/usuarios")
+@CrossOrigin(origins = "*")
 public class UsuarioController {
 
     @Autowired
     private UsuarioService usuarioService;
 
-    //leer
+
+
     @GetMapping
     public List<Usuario> getUsuarios() {
         return usuarioService.mostrarUsuarios();
     }
 
-    //guardar
     @PostMapping("/registrarUsuario")
     public Usuario postUsuario(@RequestBody Usuario usuario) {
         return usuarioService.guardarUsuario(usuario);
     }
 
-    //actualizar
     @PutMapping("/{id}")
     public Usuario putUsuario(@PathVariable Long id, @RequestBody Usuario usuario) {
         return usuarioService.actualizarUsuario(id, usuario);
     }
 
-    //eliminar
     @DeleteMapping("/{id}")
     public void deleteUsuario(@PathVariable Long id) {
         usuarioService.eliminarUsuario(id);
     }
 
-    //buscar po id
     @GetMapping("/{id}")
     public Usuario getUsuarioById(@PathVariable Long id) {
         return usuarioService.buscarById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
 
+
+
+    @PutMapping("/{id}/plan")
+    public ResponseEntity<?> actualizarSuscripcion(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        try {
+
+            String nombrePlan = payload.get("nombrePlan");
+            Usuario actualizado = usuarioService.actualizarSuscripcion(id, nombrePlan);
+            return ResponseEntity.ok(actualizado);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error al cambiar plan: " + e.getMessage());
+        }
+    }
 }
