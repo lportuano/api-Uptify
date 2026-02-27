@@ -1,5 +1,6 @@
 package com.itsqmet.service;
 
+import com.itsqmet.component.JwtUtil;
 import com.itsqmet.entity.Plan;
 import com.itsqmet.entity.Usuario;
 import com.itsqmet.repository.PlanRepository;
@@ -13,7 +14,9 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -27,6 +30,9 @@ public class UsuarioService implements UserDetailsService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtUtil jwtUtil;
 
     public List<Usuario> mostrarUsuarios() {
         return usuarioRepository.findAll();
@@ -42,9 +48,9 @@ public class UsuarioService implements UserDetailsService {
         usuario.setPassword(passwordEncriptada);
         usuario.setRol(Rol.ROLE_USUARIO);
 
-        // 2. Asignación automática del plan gratuito al registrarse
+
         Plan planBase = planRepository.findByNombre("Gratuito")
-                .orElse(null); // Si no existe, queda nulo hasta que corras el SQL
+                .orElse(null);
         usuario.setPlan(planBase);
 
         return usuarioRepository.save(usuario);
@@ -59,8 +65,6 @@ public class UsuarioService implements UserDetailsService {
         usuarioExistente.setEmail(usuario.getEmail());
         usuarioExistente.setRol(usuario.getRol());
 
-        // FIX: Antes comparabas el password consigo mismo (!password.equals(password))
-        // Ahora verificamos si el usuario envió un nuevo password (no nulo y no vacío)
         if (usuario.getPassword() != null && !usuario.getPassword().trim().isEmpty()) {
             usuarioExistente.setPassword(passwordEncoder.encode(usuario.getPassword()));
         }
@@ -97,4 +101,25 @@ public class UsuarioService implements UserDetailsService {
                 .authorities(usuario.getRol().name())
                 .build();
     }
+
+    //NUEVO
+//LOGIN - TOKEN
+    public Map<String, String> autenticar(Usuario loginUsuario) {
+        Optional<Usuario> usuarioEncontrado = usuarioRepository.findByEmail(loginUsuario.getEmail());
+        if (usuarioEncontrado.isPresent()) {
+            Usuario usuario = usuarioEncontrado.get();
+            // Verificamos la contraseña
+            if (passwordEncoder.matches(loginUsuario.getPassword(), usuario.getPassword())) {
+                String token = jwtUtil.generarToken(usuario.getEmail(), usuario.getRol().name());
+                Map<String, String> response = new HashMap<>();
+                response.put("token", token);
+                response.put("email", usuario.getEmail());
+                response.put("rol", usuario.getRol().name());
+                return response;
+            }
+        }
+        // Si usuario no existe o contraseña inválida
+        return null;
+    }
+
 }
