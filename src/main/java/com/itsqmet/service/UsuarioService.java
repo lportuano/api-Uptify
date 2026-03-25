@@ -48,7 +48,6 @@ public class UsuarioService implements UserDetailsService {
         usuario.setPassword(passwordEncriptada);
         usuario.setRol(Rol.ROLE_USUARIO);
 
-
         Plan planBase = planRepository.findByNombre("Gratuito")
                 .orElse(null);
         usuario.setPlan(planBase);
@@ -56,7 +55,7 @@ public class UsuarioService implements UserDetailsService {
         return usuarioRepository.save(usuario);
     }
 
-    // Actualizar
+    // Actualizar datos generales
     public Usuario actualizarUsuario(Long id, Usuario usuario) {
         Usuario usuarioExistente = buscarById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
@@ -72,7 +71,10 @@ public class UsuarioService implements UserDetailsService {
         return usuarioRepository.save(usuarioExistente);
     }
 
-    // NUEVO: Método para cambiar solo el plan (usado por el formulario Premium)
+    /**
+     * ACTUALIZACIÓN DE SUSCRIPCIÓN
+     * Este método permite cambiar el plan a Premium o Familiar.
+     */
     public Usuario actualizarSuscripcion(Long id, String nombrePlan) {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
@@ -102,24 +104,32 @@ public class UsuarioService implements UserDetailsService {
                 .build();
     }
 
-    //NUEVO
-//LOGIN - TOKEN
-    public Map<String, String> autenticar(Usuario loginUsuario) {
+    /**
+     * AUTENTICACIÓN Y GENERACIÓN DE TOKEN
+     * Modificado para incluir el ID en la respuesta y evitar el 'undefined' en el frontend.
+     */
+    public Map<String, Object> autenticar(Usuario loginUsuario) {
         Optional<Usuario> usuarioEncontrado = usuarioRepository.findByEmail(loginUsuario.getEmail());
+
         if (usuarioEncontrado.isPresent()) {
             Usuario usuario = usuarioEncontrado.get();
-            // Verificamos la contraseña
+
+            // Verificamos la contraseña encriptada
             if (passwordEncoder.matches(loginUsuario.getPassword(), usuario.getPassword())) {
                 String token = jwtUtil.generarToken(usuario.getEmail(), usuario.getRol().name());
-                Map<String, String> response = new HashMap<>();
+
+                // Cambiamos Map<String, String> a Map<String, Object> para soportar el ID (Long)
+                Map<String, Object> response = new HashMap<>();
                 response.put("token", token);
                 response.put("email", usuario.getEmail());
                 response.put("rol", usuario.getRol().name());
+
+                // AGREGAMOS EL ID: Clave para que el frontend funcione
+                response.put("id", usuario.getId());
+
                 return response;
             }
         }
-        // Si usuario no existe o contraseña inválida
-        return null;
+        return null; // Credenciales inválidas
     }
-
 }

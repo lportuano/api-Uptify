@@ -1,7 +1,6 @@
 package com.itsqmet.controller;
 
 import com.itsqmet.entity.Usuario;
-
 import com.itsqmet.repository.UsuarioRepository;
 import com.itsqmet.service.UsuarioService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,13 +27,14 @@ public class LoginController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Usuario loginUsuario) {
-        // Delegamos TODA la lógica al servicio
-        Map<String, String> authResponse = usuarioService.autenticar(loginUsuario);
+        // CAMBIO AQUÍ: Usamos Map<String, Object> para que coincida con el Service
+        Map<String, Object> authResponse = usuarioService.autenticar(loginUsuario);
+
         if (authResponse != null) {
-            // Si las credenciales son correctas, devolvemos el JSON con el Token y el Rol
+            // Ahora este mapa contiene token, rol e ID sin errores de tipo
             return ResponseEntity.ok(authResponse);
         }
-        // Si fallan, devolvemos un 401 (No autorizado) con un mensaje claro
+
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(Map.of("error", "Credenciales incorrectas"));
     }
