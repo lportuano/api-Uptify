@@ -48,6 +48,7 @@ public class UsuarioService implements UserDetailsService {
         usuario.setPassword(passwordEncriptada);
         usuario.setRol(Rol.ROLE_USUARIO);
 
+        // Al registrar, siempre es Gratuito por defecto
         Plan planBase = planRepository.findByNombre("Gratuito")
                 .orElse(null);
         usuario.setPlan(planBase);
@@ -73,7 +74,6 @@ public class UsuarioService implements UserDetailsService {
 
     /**
      * ACTUALIZACIÓN DE SUSCRIPCIÓN
-     * Este método permite cambiar el plan a Premium o Familiar.
      */
     public Usuario actualizarSuscripcion(Long id, String nombrePlan) {
         Usuario usuario = usuarioRepository.findById(id)
@@ -106,7 +106,7 @@ public class UsuarioService implements UserDetailsService {
 
     /**
      * AUTENTICACIÓN Y GENERACIÓN DE TOKEN
-     * Modificado para incluir el ID en la respuesta y evitar el 'undefined' en el frontend.
+     * Ahora incluimos el NOMBRE DEL PLAN en el token.
      */
     public Map<String, Object> autenticar(Usuario loginUsuario) {
         Optional<Usuario> usuarioEncontrado = usuarioRepository.findByEmail(loginUsuario.getEmail());
@@ -114,22 +114,25 @@ public class UsuarioService implements UserDetailsService {
         if (usuarioEncontrado.isPresent()) {
             Usuario usuario = usuarioEncontrado.get();
 
-            // Verificamos la contraseña encriptada
             if (passwordEncoder.matches(loginUsuario.getPassword(), usuario.getPassword())) {
-                String token = jwtUtil.generarToken(usuario.getEmail(), usuario.getRol().name());
 
-                // Cambiamos Map<String, String> a Map<String, Object> para soportar el ID (Long)
+                // 1. Obtenemos el nombre del plan real de la base de datos
+                String nombrePlan = (usuario.getPlan() != null) ? usuario.getPlan().getNombre() : "Gratuito";
+
+                // 2. Generamos el token pasando el PLAN en lugar del ROL
+                // Esto hará que Angular reciba "Premium" o "Familiar" en el campo role del JWT
+                String token = jwtUtil.generarToken(usuario.getEmail(), nombrePlan);
+
                 Map<String, Object> response = new HashMap<>();
                 response.put("token", token);
                 response.put("email", usuario.getEmail());
-                response.put("rol", usuario.getRol().name());
-
-                // AGREGAMOS EL ID: Clave para que el frontend funcione
                 response.put("id", usuario.getId());
+                response.put("plan", nombrePlan); // Información extra para el frontend
+                response.put("rol", usuario.getRol().name()); // Mantenemos el rol por si acaso
 
                 return response;
             }
         }
-        return null; // Credenciales inválidas
+        return null;
     }
 }
