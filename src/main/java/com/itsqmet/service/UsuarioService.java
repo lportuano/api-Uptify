@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional; // Importante para procedimientos
 
 import java.util.HashMap;
 import java.util.List;
@@ -48,9 +49,7 @@ public class UsuarioService implements UserDetailsService {
         usuario.setPassword(passwordEncriptada);
         usuario.setRol(Rol.ROLE_USUARIO);
 
-        // Al registrar, siempre es Gratuito por defecto
-        Plan planBase = planRepository.findByNombre("Gratuito")
-                .orElse(null);
+        Plan planBase = planRepository.findByNombre("Gratuito").orElse(null);
         usuario.setPlan(planBase);
 
         return usuarioRepository.save(usuario);
@@ -72,9 +71,6 @@ public class UsuarioService implements UserDetailsService {
         return usuarioRepository.save(usuarioExistente);
     }
 
-    /**
-     * ACTUALIZACIÓN DE SUSCRIPCIÓN
-     */
     public Usuario actualizarSuscripcion(Long id, String nombrePlan) {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
@@ -104,35 +100,34 @@ public class UsuarioService implements UserDetailsService {
                 .build();
     }
 
-    /**
-     * AUTENTICACIÓN Y GENERACIÓN DE TOKEN
-     * Ahora incluimos el NOMBRE DEL PLAN en el token.
-     */
     public Map<String, Object> autenticar(Usuario loginUsuario) {
         Optional<Usuario> usuarioEncontrado = usuarioRepository.findByEmail(loginUsuario.getEmail());
 
         if (usuarioEncontrado.isPresent()) {
             Usuario usuario = usuarioEncontrado.get();
-
             if (passwordEncoder.matches(loginUsuario.getPassword(), usuario.getPassword())) {
-
-                // 1. Obtenemos el nombre del plan real de la base de datos
                 String nombrePlan = (usuario.getPlan() != null) ? usuario.getPlan().getNombre() : "Gratuito";
-
-                // 2. Generamos el token pasando el PLAN en lugar del ROL
-                // Esto hará que Angular reciba "Premium" o "Familiar" en el campo role del JWT
                 String token = jwtUtil.generarToken(usuario.getEmail(), nombrePlan);
 
                 Map<String, Object> response = new HashMap<>();
                 response.put("token", token);
                 response.put("email", usuario.getEmail());
                 response.put("id", usuario.getId());
-                response.put("plan", nombrePlan); // Información extra para el frontend
-                response.put("rol", usuario.getRol().name()); // Mantenemos el rol por si acaso
+                response.put("plan", nombrePlan);
+                response.put("rol", usuario.getRol().name());
 
                 return response;
             }
         }
         return null;
+    }
+
+    /**
+     * MÉTODO PARA EL PROCEDIMIENTO ALMACENADO
+     * Usamos @Transactional porque los procedimientos suelen modificar datos.
+     */
+    @Transactional
+    public void reportarErrorBaseDatos(Integer usuarioId, String descripcion, String modulo) {
+        usuarioRepository.registrarError(usuarioId, descripcion, modulo);
     }
 }
