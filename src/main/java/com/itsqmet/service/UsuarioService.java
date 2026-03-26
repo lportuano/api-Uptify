@@ -6,6 +6,8 @@ import com.itsqmet.entity.Usuario;
 import com.itsqmet.repository.PlanRepository;
 import com.itsqmet.repository.UsuarioRepository;
 import com.itsqmet.role.Rol;
+import jakarta.persistence.EntityManager; // Importar para SQL Nativo
+import jakarta.persistence.PersistenceContext; // Importar
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -13,7 +15,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional; // Importante para procedimientos
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
@@ -35,6 +37,10 @@ public class UsuarioService implements UserDetailsService {
     @Autowired
     private JwtUtil jwtUtil;
 
+    // --- NUEVO: Inyectamos EntityManager para hablar con el Trigger ---
+    @PersistenceContext
+    private EntityManager entityManager;
+
     public List<Usuario> mostrarUsuarios() {
         return usuarioRepository.findAll();
     }
@@ -43,7 +49,6 @@ public class UsuarioService implements UserDetailsService {
         return usuarioRepository.findById(id);
     }
 
-    // Guardar (Registro)
     public Usuario guardarUsuario(Usuario usuario) {
         String passwordEncriptada = passwordEncoder.encode(usuario.getPassword());
         usuario.setPassword(passwordEncriptada);
@@ -55,10 +60,14 @@ public class UsuarioService implements UserDetailsService {
         return usuarioRepository.save(usuario);
     }
 
-    // Actualizar datos generales
-    public Usuario actualizarUsuario(Long id, Usuario usuario) {
+    // MODIFICADO: Ahora recibe quién edita para el Trigger
+    @Transactional
+    public Usuario actualizarUsuario(Long id, Usuario usuario, Long idDeQuienEdita) {
         Usuario usuarioExistente = buscarById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        // SETEAMOS LA VARIABLE EN POSTGRES
+        entityManager.createNativeQuery("SET app.usuario_activo_id = '" + idDeQuienEdita + "'").executeUpdate();
 
         usuarioExistente.setNombre(usuario.getNombre());
         usuarioExistente.setEmail(usuario.getEmail());
@@ -82,9 +91,15 @@ public class UsuarioService implements UserDetailsService {
         return usuarioRepository.save(usuario);
     }
 
-    public void eliminarUsuario(Long id) {
+    // MODIFICADO: Ahora recibe quién elimina para el Trigger
+    @Transactional
+    public void eliminarUsuario(Long id, Long idDeQuienElimina) {
         Usuario usuarioEliminar = buscarById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no existe"));
+
+        // SETEAMOS LA VARIABLE EN POSTGRES
+        entityManager.createNativeQuery("SET app.usuario_activo_id = '" + idDeQuienElimina + "'").executeUpdate();
+
         usuarioRepository.delete(usuarioEliminar);
     }
 
@@ -122,10 +137,6 @@ public class UsuarioService implements UserDetailsService {
         return null;
     }
 
-    /**
-     * MÉTODO PARA EL PROCEDIMIENTO ALMACENADO
-     * Usamos @Transactional porque los procedimientos suelen modificar datos.
-     */
     @Transactional
     public void reportarErrorBaseDatos(Integer usuarioId, String descripcion, String modulo) {
         usuarioRepository.registrarError(usuarioId, descripcion, modulo);

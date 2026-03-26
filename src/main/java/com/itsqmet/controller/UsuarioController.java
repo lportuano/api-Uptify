@@ -17,8 +17,6 @@ public class UsuarioController {
     @Autowired
     private UsuarioService usuarioService;
 
-    // --- CRUD BÁSICO ---
-
     @GetMapping
     public List<Usuario> getUsuarios() {
         return usuarioService.mostrarUsuarios();
@@ -29,14 +27,26 @@ public class UsuarioController {
         return usuarioService.guardarUsuario(usuario);
     }
 
+    // --- CORRECCIÓN AQUÍ: Recibimos el ID de quien edita desde el Header ---
     @PutMapping("/{id}")
-    public Usuario putUsuario(@PathVariable Long id, @RequestBody Usuario usuario) {
-        return usuarioService.actualizarUsuario(id, usuario);
+    public Usuario putUsuario(
+            @PathVariable Long id,
+            @RequestBody Usuario usuario,
+            @RequestHeader(value = "X-Usuario-Id", required = false) Long idEditor) {
+
+        // Si no viene el header, podemos usar el mismo ID del usuario o un 0
+        Long autorId = (idEditor != null) ? idEditor : id;
+        return usuarioService.actualizarUsuario(id, usuario, autorId);
     }
 
+    // --- CORRECCIÓN AQUÍ: Recibimos el ID de quien elimina ---
     @DeleteMapping("/{id}")
-    public void deleteUsuario(@PathVariable Long id) {
-        usuarioService.eliminarUsuario(id);
+    public void deleteUsuario(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-Usuario-Id", required = false) Long idEditor) {
+
+        Long autorId = (idEditor != null) ? idEditor : 0L;
+        usuarioService.eliminarUsuario(id, autorId);
     }
 
     @GetMapping("/{id}")
@@ -44,8 +54,6 @@ public class UsuarioController {
         return usuarioService.buscarById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
-
-    // --- LÓGICA DE NEGOCIO (SUSCRIPCIONES) ---
 
     @PutMapping("/{id}/plan")
     public ResponseEntity<?> actualizarSuscripcion(@PathVariable Long id, @RequestBody Map<String, String> payload) {
@@ -58,18 +66,14 @@ public class UsuarioController {
         }
     }
 
-    // --- LLAMADA AL PROCEDIMIENTO ALMACENADO (STORED PROCEDURE) ---
-
     @PostMapping("/reportar-error")
     public ResponseEntity<?> reportarError(@RequestBody Map<String, Object> payload) {
         try {
-            // Convertimos el ID que viene de la web a Integer
             Integer usuarioId = Integer.parseInt(payload.get("usuarioId").toString());
             String descripcion = (String) payload.get("descripcion");
             String modulo = (String) payload.get("modulo");
 
             usuarioService.reportarErrorBaseDatos(usuarioId, descripcion, modulo);
-
             return ResponseEntity.ok(Map.of("mensaje", "Reporte procesado exitosamente"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
